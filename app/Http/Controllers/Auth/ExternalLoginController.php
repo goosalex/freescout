@@ -30,10 +30,20 @@ class ExternalLoginController extends Controller
 
         $reguser = User::where('email', $getInfo->email)->first();
         if (!$reguser) {
+            $first_name = ''; $last_name = '';
+
+            $name_parts = preg_split("/[\s,]+/",$getInfo->name,2);
+            if ($name_parts && count($name_parts)==2){
+                $first_name = $name_parts[0];
+                $last_name  = $name_parts[1];
+            } else $first_name = $getInfo->name;
+
             $reguser = User::create([
-                'name'     => $getInfo->name,
-                'email'    => $getInfo->email,
-                'password' => $this->random_str(26)
+                'name'          => $getInfo->name,
+                'first_name'    => $first_name,
+                'last_name'     => $last_name,
+                'email'         => $getInfo->email,
+                'password'      => $this->random_str(26)
             ]);
         }
         auth()->login($reguser);
