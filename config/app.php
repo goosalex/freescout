@@ -268,9 +268,9 @@ return [
     /*
     |--------------------------------------------------------------------------
     | none - send to the customer only agent's reply in the email.
-    | 
+    |
     | last - send to the customer the last message in the email.
-    | 
+    |
     | full - send to the customer full conversation history in the email.
     |
     |-------------------------------------------------------------------------
@@ -280,7 +280,7 @@ return [
     /*
     |--------------------------------------------------------------------------
     | none - send to the user only agent's reply in the email.
-    | 
+    |
     | last - send to the user the last message in the email.
     |
     | full - send to the user full conversation history in the email.
@@ -354,6 +354,12 @@ return [
         // Autodiscovery did not work for this one, becasuse it's composer.json
         // does not have a `extra` section.
         Codedge\Updater\UpdaterServiceProvider::class,
+
+        /*
+         * External Login Providers, custom
+         */
+        \SocialiteProviders\Manager\ServiceProvider::class,
+
     ],
 
     /*
