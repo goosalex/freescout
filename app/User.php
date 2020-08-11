@@ -75,12 +75,14 @@ class User extends Authenticatable
     const PERM_EDIT_CONVERSATIONS = 2;
     const PERM_EDIT_SAVED_REPLIES = 3;
     const PERM_EDIT_TAGS = 4;
+    const PERM_EDIT_CUSTOM_FOLDERS = 5;
 
     public static $user_permissions = [
         self::PERM_DELETE_CONVERSATIONS,
         self::PERM_EDIT_CONVERSATIONS,
         self::PERM_EDIT_SAVED_REPLIES,
         self::PERM_EDIT_TAGS,
+        self::PERM_EDIT_CUSTOM_FOLDERS,
     ];
 
     const WEBSITE_NOTIFICATIONS_PAGE_SIZE = 25;
@@ -219,17 +221,19 @@ class User extends Authenticatable
     {
         if ($this->isAdmin()) {
             if ($cache) {
-                return Mailbox::rememberForever()->get();
+                $mailboxes = Mailbox::rememberForever()->get();
             } else {
-                return Mailbox::all();
+                $mailboxes = Mailbox::all();
             }
         } else {
             if ($cache) {
-                return $this->mailboxes_cached;
+                $mailboxes = $this->mailboxes_cached;
             } else {
-                return $this->mailboxes;
+                $mailboxes = $this->mailboxes;
             }
         }
+
+        return $mailboxes->sortBy('name');
     }
 
     /**
@@ -357,7 +361,7 @@ class User extends Authenticatable
      *
      * @return string
      */
-    public static function dateFormat($date, $format = 'M j, Y H:i', $user = null)
+    public static function dateFormat($date, $format = 'M j, Y H:i', $user = null, $modify_format = true)
     {
         if (!$user) {
             $user = auth()->user();
@@ -368,20 +372,22 @@ class User extends Authenticatable
         }
 
         if ($user) {
-            if ($user->time_format == self::TIME_FORMAT_12) {
-                $format = strtr($format, [
-                    'H'     => 'h',
-                    'G'     => 'g',
-                    ':i'    => ':ia',
-                    ':ia:s' => ':i:sa',
-                ]);
-            } else {
-                $format = strtr($format, [
-                    'h'     => 'H',
-                    'g'     => 'G',
-                    ':ia'   => ':i',
-                    ':i:sa' => ':i:s',
-                ]);
+            if ($modify_format) {
+                if ($user->time_format == self::TIME_FORMAT_12) {
+                    $format = strtr($format, [
+                        'H'     => 'h',
+                        'G'     => 'g',
+                        ':i'    => ':ia',
+                        ':ia:s' => ':i:sa',
+                    ]);
+                } else {
+                    $format = strtr($format, [
+                        'h'     => 'H',
+                        'g'     => 'G',
+                        ':ia'   => ':i',
+                        ':i:sa' => ':i:s',
+                    ]);
+                }
             }
             // todo: formatLocalized has to be used here and below,
             // but it returns $format value instead of formatted date
@@ -460,6 +466,7 @@ class User extends Authenticatable
             self::PERM_EDIT_CONVERSATIONS   => __('Users are allowed to edit notes/replies'),
             self::PERM_EDIT_SAVED_REPLIES   => __('Users are allowed to edit/delete saved replies'),
             self::PERM_EDIT_TAGS            => __('Users are allowed to manage tags'),
+            self::PERM_EDIT_CUSTOM_FOLDERS  => __('Users are allowed to manage custom folders'),
         ];
 
         if (!empty($user_permission_names[$user_permission])) {

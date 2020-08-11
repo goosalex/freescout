@@ -318,10 +318,16 @@ function initTooltip(selector)
 	$(selector).tooltip({container: 'body'});
 }
 
+function initTooltips()
+{
+	initTooltip('[data-toggle="tooltip"]');
+}
+
 function triggersInit()
 {
 	// Tooltips
-    initTooltip('[data-toggle="tooltip"]');
+    initTooltips();
+    
     var handler = function() {
 	  return $('body [data-toggle="tooltip"]').tooltip('hide');
 	};
@@ -1124,6 +1130,7 @@ function initConversation()
 		maybeShowStoredNote();
 		maybeShowDraft();
 		processLinks();
+		initConvSettings();
 	});
 }
 
@@ -2189,7 +2196,7 @@ function searchInit()
 	});
 }
 
-function loadConversations(page, table)
+function loadConversations(page, table, no_loader)
 {
 	var filter = null;
 	var params = {};
@@ -2201,11 +2208,14 @@ function loadConversations(page, table)
 		};
 	}
 	//var table = $(this).parents('.table-conversations:first');
-	if (typeof(table) == "undefined") {
+	if (typeof(table) == "undefined" || table === '') {
 		table = $(".table-conversations:first");
 	}
-	if (typeof(page) == "undefined") {
+	if (typeof(page) == "undefined" || page === '') {
 		page = table.attr('data-page');
+	}
+	if (typeof(no_loader) == "undefined") {
+		no_loader = false;
 	}
 	var datas = table.data();
 	for (data_name in datas) {
@@ -2242,7 +2252,8 @@ function loadConversations(page, table)
 				showAjaxError(response);
 			}
 			loaderHide();
-		}
+		},
+		no_loader
 	);
 }
 
@@ -3008,7 +3019,7 @@ function polycastInit()
 
 		    // If there are no conversations selected refresh conversations table
 		    if ($(".table-conversations:first").length && !getSelectedConversations().length) {
-		    	loadConversations();
+		    	loadConversations('', '', true);
 		    }
 	    });
 	}
@@ -4499,4 +4510,36 @@ function maybeScrollToReplyBlock(offset)
 		}
 		scrollTo(reply_block, '', null, offset);
 	}
+}
+
+
+function initConvSettings()
+{
+	var settings_modal = jQuery('#conv-settings-modal');
+    var history_select = jQuery('#email_history', settings_modal);
+
+    jQuery('.button-save-settings:first', settings_modal).on('click', function(e) {
+        e.preventDefault();
+        settings_modal.modal('hide');
+
+        fsAjax(
+            {
+                action: 'save_settings',
+                conversation_id: getGlobalAttr('conversation_id'),
+                email_history: history_select.val(),
+            },
+            laroute.route('conversations.ajax'),
+            function(response) {
+                if (typeof(response.status) != "undefined" && response.status !== 'success') {
+                    if (typeof (response.msg) != "undefined") {
+                        showFloatingAlert('error', response.msg);
+                    } else {
+                        showFloatingAlert('error', Lang.get("messages.error_occured"));
+                    }
+                    loaderHide();
+                }
+            },
+            true
+        );
+    });
 }
