@@ -1687,9 +1687,18 @@ class ConversationsController extends Controller
                 }
 
                 if (!$response['msg']) {
-                    $conversation->moveToMailbox($mailbox, $user);
 
-                    $response['status'] = 'success';
+                    if (! $mailbox->userHasAccess($user->id)) {
+                        $folder_id = $conversation->getCurrentFolder();
+                        $current_mailbox_id = $conversation->mailbox_id;
+
+                        $response['redirect_url'] = route('mailboxes.view.folder', ['id' => $current_mailbox_id, 'folder_id' => $folder_id]);
+
+
+                    }
+                        $conversation->moveToMailbox($mailbox, $user);
+                        $response['status'] = 'success';
+
                     \Session::flash('flash_success_floating', __('Conversation moved'));
                 }
 
@@ -1910,7 +1919,7 @@ class ConversationsController extends Controller
 
         return view('conversations/ajax_html/move_conv', [
             'conversation' => $conversation,
-            'mailboxes'    => $user->mailboxesCanView(),
+            'mailboxes'    => Mailbox::all() //$user->mailboxesCanView(), Allow move to any mailbox
         ]);
     }
 
