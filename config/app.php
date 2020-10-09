@@ -361,6 +361,12 @@ return [
         // Autodiscovery did not work for this one, becasuse it's composer.json
         // does not have a `extra` section.
         Codedge\Updater\UpdaterServiceProvider::class,
+
+        /*
+         * External Login Providers, custom
+         */
+        \SocialiteProviders\Manager\ServiceProvider::class,
+
     ],
 
     /*

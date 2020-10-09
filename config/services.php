@@ -35,4 +35,19 @@ return [
         'secret' => env('STRIPE_SECRET'),
     ],
 
+    'laravelpassport' => [
+        'client_id' => env('OAUTH2_KEY'),
+        'client_secret' => env('OAUTH2_SECRET'),
+        'redirect' => env('OAUTH2_REDIRECT_URI'),
+        'host' => env('OAUTH2_HOST'),
+        'authorize_uri' => env('OAUTH2_AUTHORIZE_URI'),
+        'token_uri' => env('OAUTH2_TOKEN_URI'),
+        'userinfo_uri' => env('OAUTH2_USERINFO_URI'),
+        'userinfo_key' => env('OAUTH2_USERINFO_KEY'),
+        'user_id'   => env('OAUTH2_USER_ID'),
+        'user_name'   => env('OAUTH2_USER_NAME'),
+        'user_nickname'   => env('OAUTH2_USER_NICKNAME'),
+        'user_email'   => env('OAUTH2_USER_EMAIL'),
+        'user_avatar'   => env('OAUTH2_USER_AVATAR')
+    ],
 ];

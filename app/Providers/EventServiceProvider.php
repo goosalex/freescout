@@ -83,6 +83,10 @@ class EventServiceProvider extends ServiceProvider
         'App\Events\UserAddedNote' => [
             'App\Listeners\SendNotificationToUsers',
         ],
+
+        \SocialiteProviders\Manager\SocialiteWasCalled::class => [
+            'SocialiteProviders\\LaravelPassport\\LaravelPassportExtendSocialite@handle',
+        ],
     ];
 
     /**
