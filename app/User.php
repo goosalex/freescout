@@ -75,12 +75,14 @@ class User extends Authenticatable
     const PERM_EDIT_CONVERSATIONS = 2;
     const PERM_EDIT_SAVED_REPLIES = 3;
     const PERM_EDIT_TAGS = 4;
+    const PERM_EDIT_CUSTOM_FOLDERS = 5;
 
     public static $user_permissions = [
         self::PERM_DELETE_CONVERSATIONS,
         self::PERM_EDIT_CONVERSATIONS,
         self::PERM_EDIT_SAVED_REPLIES,
         self::PERM_EDIT_TAGS,
+        self::PERM_EDIT_CUSTOM_FOLDERS,
     ];
 
     const WEBSITE_NOTIFICATIONS_PAGE_SIZE = 25;
@@ -140,7 +142,8 @@ class User extends Authenticatable
         return $this->belongsToMany('App\Mailbox')->as('settings')
             ->withPivot('after_send')
             ->withPivot('hide')
-            ->withPivot('mute');
+            ->withPivot('mute')
+            ->withPivot('access');
     }
 
     /**
@@ -219,17 +222,19 @@ class User extends Authenticatable
     {
         if ($this->isAdmin()) {
             if ($cache) {
-                return Mailbox::rememberForever()->get();
+                $mailboxes = Mailbox::rememberForever()->get();
             } else {
-                return Mailbox::all();
+                $mailboxes = Mailbox::all();
             }
         } else {
             if ($cache) {
-                return $this->mailboxes_cached;
+                $mailboxes = $this->mailboxes_cached;
             } else {
-                return $this->mailboxes;
+                $mailboxes = $this->mailboxes;
             }
         }
+
+        return $mailboxes->sortBy('name');
     }
 
     /**
@@ -240,13 +245,13 @@ class User extends Authenticatable
         $user = $this;
 
         if ($this->isAdmin()) {
-            $query = Mailbox::select(['mailboxes.*', 'mailbox_user.hide', 'mailbox_user.mute'])
+            $query = Mailbox::select(['mailboxes.*', 'mailbox_user.hide', 'mailbox_user.mute', 'mailbox_user.access'])
                         ->leftJoin('mailbox_user', function ($join) use ($user) {
                             $join->on('mailbox_user.mailbox_id', '=', 'mailboxes.id');
                             $join->where('mailbox_user.user_id', $user->id);
                         });
         } else {
-            $query = Mailbox::select(['mailboxes.*', 'mailbox_user.hide', 'mailbox_user.mute'])
+            $query = Mailbox::select(['mailboxes.*', 'mailbox_user.hide', 'mailbox_user.mute', 'mailbox_user.access'])
                         ->join('mailbox_user', function ($join) use ($user) {
                             $join->on('mailbox_user.mailbox_id', '=', 'mailboxes.id');
                             $join->where('mailbox_user.user_id', $user->id);
@@ -259,6 +264,29 @@ class User extends Authenticatable
         }
     }
 
+    public function mailboxesSettings($cache = true)
+    {
+        $user = $this;
+
+        $query = MailboxUser::where('user_id', $user->id);
+
+        if ($cache) {
+            return $query->rememberForever()->get();
+        } else {
+            return $query->get();
+        }
+    }
+
+    public function mailboxSettings($mailbox_id)
+    {
+        $settings = $this->mailboxesSettings()->where('mailbox_id', $mailbox_id)->first();
+
+        if (!$settings) {
+            return Mailbox::getDummySettings();
+        }
+
+        return $settings;
+    }
     /**
      * Get IDs of mailboxes to which user has access.
      */
@@ -276,6 +304,53 @@ class User extends Authenticatable
         $ids = $this->mailboxesIdsCanView();
         return in_array($mailbox_id, $ids);
     }
+
+    /**
+     * Check to see if the user can manage any mailboxes
+     */
+    public function hasManageMailboxAccess() {
+        if ($this->isAdmin()) {
+            return true;
+        } else {
+            //$mailboxes = $this->mailboxesCanViewWithSettings(true);
+            $mailboxes = $this->mailboxesSettings();
+            foreach ($mailboxes as $mailbox) {
+                if (!empty(json_decode($mailbox->access))) {
+                    return true;
+                }
+            };
+        }
+    }
+
+    /**
+     * Check to see if the user can manage a specific mailbox
+     */
+    public function canManageMailbox($mailbox_id)
+    {
+        if ($this->isAdmin()) {
+            return true;
+        } else {
+            //$mailbox = $this->mailboxesCanViewWithSettings(true)->where('id', $mailbox_id)->first();
+            $mailbox = $this->mailboxesSettings()->where('mailbox_id', $mailbox_id)->first();
+            if ($mailbox && !empty(json_decode($mailbox->access))) {
+                return true;
+            }
+        }
+    }
+
+    public function hasManageMailboxPermission($mailbox_id, $perm) {
+        if ($this->isAdmin()) {
+            return true;
+        } else {
+            //$mailbox = $this->mailboxesCanViewWithSettings(true)->where('id', $mailbox_id)->first();
+            $mailbox = $this->mailboxesSettings()->where('mailbox_id', $mailbox_id)->first();
+            if ($mailbox && !empty($mailbox->access) && in_array($perm, json_decode($mailbox->access))) {
+                return true;
+            }
+        }
+    }
+
+
 
     /**
      * Generate random password for the user.
@@ -357,7 +432,7 @@ class User extends Authenticatable
      *
      * @return string
      */
-    public static function dateFormat($date, $format = 'M j, Y H:i', $user = null)
+    public static function dateFormat($date, $format = 'M j, Y H:i', $user = null, $modify_format = true)
     {
         if (!$user) {
             $user = auth()->user();
@@ -367,21 +442,27 @@ class User extends Authenticatable
             $date = Carbon::parse($date);
         }
 
+        if (!$date) {
+            return '';
+        }
+
         if ($user) {
-            if ($user->time_format == self::TIME_FORMAT_12) {
-                $format = strtr($format, [
-                    'H'     => 'h',
-                    'G'     => 'g',
-                    ':i'    => ':ia',
-                    ':ia:s' => ':i:sa',
-                ]);
-            } else {
-                $format = strtr($format, [
-                    'h'     => 'H',
-                    'g'     => 'G',
-                    ':ia'   => ':i',
-                    ':i:sa' => ':i:s',
-                ]);
+            if ($modify_format) {
+                if ($user->time_format == self::TIME_FORMAT_12) {
+                    $format = strtr($format, [
+                        'H'     => 'h',
+                        'G'     => 'g',
+                        ':i'    => ':ia',
+                        ':ia:s' => ':i:sa',
+                    ]);
+                } else {
+                    $format = strtr($format, [
+                        'h'     => 'H',
+                        'g'     => 'G',
+                        ':ia'   => ':i',
+                        ':i:sa' => ':i:s',
+                    ]);
+                }
             }
             // todo: formatLocalized has to be used here and below,
             // but it returns $format value instead of formatted date
@@ -460,6 +541,7 @@ class User extends Authenticatable
             self::PERM_EDIT_CONVERSATIONS   => __('Users are allowed to edit notes/replies'),
             self::PERM_EDIT_SAVED_REPLIES   => __('Users are allowed to edit/delete saved replies'),
             self::PERM_EDIT_TAGS            => __('Users are allowed to manage tags'),
+            self::PERM_EDIT_CUSTOM_FOLDERS  => __('Users are allowed to manage custom folders'),
         ];
 
         if (!empty($user_permission_names[$user_permission])) {

@@ -24,6 +24,35 @@ var poly;
 // List of funcions preparin data for polycast receive request
 var poly_data_closures = [];
 
+var fs_select2_config = {
+	//containerCssClass: "select2-multi-container", // select2-with-loader
+	dropdownCssClass: "select2-multi-dropdown",
+	//dropdownParent: $('.modal-dialog:visible:first'),
+	multiple: true,
+	//maximumSelectionLength: 1,
+	//placeholder: input.attr('placeholder'),
+	minimumInputLength: 1,
+	tags: true,
+	createTag: function (params) {
+	    return {
+			id: params.term,
+			text: params.term,
+			newOption: true
+	    }
+	},
+	templateResult: function (data) {
+	    var $result = $("<span></span>");
+
+	    $result.text(data.text);
+
+	    if (data.newOption) {
+	     	$result.append(" <em>("+Lang.get("messages.add_lower")+")</em>");
+	    }
+
+	    return $result;
+	}
+};
+
 // Default validation options
 // https://devhints.io/parsley
 window.ParsleyConfig = window.ParsleyConfig || {};
@@ -318,10 +347,16 @@ function initTooltip(selector)
 	$(selector).tooltip({container: 'body'});
 }
 
+function initTooltips()
+{
+	initTooltip('[data-toggle="tooltip"]');
+}
+
 function triggersInit()
 {
 	// Tooltips
-    initTooltip('[data-toggle="tooltip"]');
+    initTooltips();
+    
     var handler = function() {
 	  return $('body [data-toggle="tooltip"]').tooltip('hide');
 	};
@@ -631,34 +666,7 @@ function mailboxConnectionIncomingInit()
 			e.preventDefault();
 		});
 
-		$("#in_imap_folders").select2({
-			//containerCssClass: "select2-multi-container", // select2-with-loader
-     		dropdownCssClass: "select2-multi-dropdown",
-			//dropdownParent: $('.modal-dialog:visible:first'),
-			multiple: true,
-			//maximumSelectionLength: 1,
-			//placeholder: input.attr('placeholder'),
-			minimumInputLength: 1,
-			tags: true,
-			createTag: function (params) {
-			    return {
-					id: params.term,
-					text: params.term,
-					newOption: true
-			    }
-			},
-			templateResult: function (data) {
-			    var $result = $("<span></span>");
-
-			    $result.text(data.text);
-
-			    if (data.newOption) {
-			     	$result.append(" <em>("+Lang.get("messages.add_lower")+")</em>");
-			    }
-
-			    return $result;
-			},
-		});
+		$("#in_imap_folders").select2(fs_select2_config);
 	});
 }
 
@@ -1120,10 +1128,45 @@ function initConversation()
 			e.preventDefault();
 		});
 
+		// Edit subject
+		jQuery(".conv-subjtext").click(function(e){
+	    	$(this).addClass('conv-subj-editing');
+		});
+
+		// Save subject
+	    jQuery(".conv-subj-editor button:first").click(function(e){
+	    	var button = $(this);
+	    	button.button('loading');
+	    	var value = $('#conv-subj-value').val();
+			fsAjax(
+				{
+					action: 'update_subject',
+					conversation_id: getGlobalAttr('conversation_id'),
+					value: value
+				},
+				laroute.route('conversations.ajax'),
+				function(response) {
+					if (isAjaxSuccess(response)) {
+						$('.conv-subjtext > span:first').text(value);
+					} else {
+						showAjaxError(response);
+					}
+					button.parents('.conv-subj-editing:first').removeClass('conv-subj-editing');
+					button.button('reset');
+				}, true
+			);
+		});
+
+		// Print
+		if (getQueryParam('print')) {
+			window.print();
+		}
+
 		starConversationInit();
 		maybeShowStoredNote();
 		maybeShowDraft();
 		processLinks();
+		initConvSettings();
 	});
 }
 
@@ -2189,7 +2232,7 @@ function searchInit()
 	});
 }
 
-function loadConversations(page, table)
+function loadConversations(page, table, no_loader)
 {
 	var filter = null;
 	var params = {};
@@ -2201,11 +2244,14 @@ function loadConversations(page, table)
 		};
 	}
 	//var table = $(this).parents('.table-conversations:first');
-	if (typeof(table) == "undefined") {
+	if (typeof(table) == "undefined" || table === '') {
 		table = $(".table-conversations:first");
 	}
-	if (typeof(page) == "undefined") {
+	if (typeof(page) == "undefined" || page === '') {
 		page = table.attr('data-page');
+	}
+	if (typeof(no_loader) == "undefined") {
+		no_loader = false;
 	}
 	var datas = table.data();
 	for (data_name in datas) {
@@ -2242,7 +2288,8 @@ function loadConversations(page, table)
 				showAjaxError(response);
 			}
 			loaderHide();
-		}
+		},
+		no_loader
 	);
 }
 
@@ -2406,6 +2453,75 @@ function initMoveConv()
 				$(".move-conv-mailbox-id:first").removeAttr('disabled');
 			}
 		});
+	});
+}
+
+// Move conversation modal
+function initMergeConv()
+{
+	$(document).ready(function() {
+		initTooltips();
+
+		initMergeConvSelect();
+
+		$(".btn-merge-conv:visible:first").click(function(e){
+			var button = $(this);
+
+			button.button('loading');
+
+			fsAjax({
+					action: 'conversation_merge',
+					merge_conversation_id: $('.conv-merge-id:checked').val(),
+					conversation_id: getGlobalAttr('conversation_id')
+				},
+				laroute.route('conversations.ajax'),
+				function(response) {
+					showAjaxResult(response);
+					if (isAjaxSuccess(response)) {
+						window.location.href = '';
+					}
+					ajaxFinish();
+				}
+			);
+
+			e.preventDefault();
+		});
+
+		$(".btn-merge-search:visible:first").click(function(e){
+			var button = $(this);
+
+			button.button('loading');
+
+			fsAjax({
+					action: 'merge_search',
+					number: $('.merge-conv-number:visible:first').val(),
+				},
+				laroute.route('conversations.ajax'),
+				function(response) {
+					showAjaxResult(response);
+					if (isAjaxSuccess(response) && response.html) {
+						$('.conv-merge-search-result:first td:first').html(response.html);
+						$('.conv-merge-search-result:first').removeClass('hidden');
+						initTooltips();
+						initMergeConvSelect();
+					} else {
+						if ($('.conv-merge-search-result:first .conv-merge-id').is(':checked')) {
+							$('.btn-merge-conv:visible:first').attr('disabled', 'disabled');
+						}
+						$('.conv-merge-search-result:first td:first').html(response.html);
+						$('.conv-merge-search-result:first').addClass('hidden');
+					}
+					ajaxFinish();
+				}
+			);
+		});
+	});
+}
+
+function initMergeConvSelect()
+{
+	$('.conv-merge-id').click(function() {
+		$('.btn-merge-conv:visible:first').removeAttr('disabled');
 	});
 }
 
@@ -3008,7 +3124,7 @@ function polycastInit()
 
 		    // If there are no conversations selected refresh conversations table
 		    if ($(".table-conversations:first").length && !getSelectedConversations().length) {
-		    	loadConversations();
+		    	loadConversations('', '', true);
 		    }
 	    });
 	}
@@ -4499,4 +4615,97 @@ function maybeScrollToReplyBlock(offset)
 		}
 		scrollTo(reply_block, '', null, offset);
 	}
+}
+
+function initConvSettings()
+{
+	var settings_modal = jQuery('#conv-settings-modal');
+    var history_select = jQuery('#email_history', settings_modal);
+
+	$('#conv-settings-modal').on('show.bs.modal', function (e) {
+		var is_forward = $(".conv-reply-block.conv-forward-block").length;
+
+		if (is_forward) {
+			$('#email_history option[value="global"]').hide();
+			$('#email_history option[value="none"]').hide();
+			if ($('#email_history').val() == 'global') {
+				$('#email_history').val('full');
+			}
+		} else {
+			$('#email_history option[value="global"]').show();
+			$('#email_history option[value="none"]').show();
+		}
+	})
+
+    $('.button-save-settings:first', settings_modal).on('click', function(e) {
+        e.preventDefault();
+        settings_modal.modal('hide');
+
+        $(".conv-reply-block").children().find(":input[name='conv_history']:first").val(history_select.val());
+
+        /*fsAjax(
+            {
+                action: 'save_settings',
+                conversation_id: getGlobalAttr('conversation_id'),
+                email_history: history_select.val(),
+            },
+            laroute.route('conversations.ajax'),
+            function(response) {
+                if (typeof(response.status) != "undefined" && response.status !== 'success') {
+                    if (typeof (response.msg) != "undefined") {
+                        showFloatingAlert('error', response.msg);
+                    } else {
+                        showFloatingAlert('error', Lang.get("messages.error_occured"));
+                    }
+                    loaderHide();
+                }
+            },
+            true
+        );*/
+    });
+
+
+    $('.button-cancel-settings:first', settings_modal).on('click', function(e) {
+        e.preventDefault();
+        settings_modal.modal('hide');
+
+	   	var value = $(".conv-reply-block").children().find(":input[name='conv_history']:first").val();
+	   	if (!value) {
+	   		value = 'global';
+	   	}
+		jQuery('#email_history', jQuery('#conv-settings-modal')).val(value);
+    });
+}
+
+function initUsers()
+{
+	$('#search-users').on('keyup keypress', function(e) {
+		var q = $(this).val().trim().toLowerCase();
+		var clear = $('#search-users-clear i:first');
+		if (q) {
+			if (clear.hasClass('glyphicon-search')) {
+				clear.removeClass('glyphicon-search').addClass('glyphicon-remove');
+			}
+			$('#users-list .card').each(function(i, el) {
+				var texts = '';
+				$(el).children('.user-q').each(function(i, el) {
+					texts += $(el).text();
+				});
+				if (texts.toLowerCase().indexOf(q) != -1) {
+					$(el).show();
+				} else {
+					$(el).hide();
+				}
+			});
+		} else {
+			if (!clear.hasClass('glyphicon-search')) {
+				clear.removeClass('glyphicon-remove').addClass('glyphicon-search');
+			}
+			$('#users-list .card').show();
+		}
+	});
+
+	$('#search-users-clear').click(function(e) {
+		$('#search-users').val('').keypress();
+	});
 }

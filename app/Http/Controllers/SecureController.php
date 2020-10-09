@@ -35,6 +35,9 @@ class SecureController extends Controller
             $mailboxes = $user->mailboxesCanViewWithSettings();
         }
 
+        // Sort by name.
+        $mailboxes = $mailboxes->sortBy('name');
+
         return view('secure/dashboard', ['mailboxes' => $mailboxes]);
     }
 
@@ -125,6 +128,9 @@ class SecureController extends Controller
                 $status = $record->getStatusName();
                 if ($record->status_message) {
                     $status .= '. '.$record->status_message;
+                    if ($record->status == SendLog::STATUS_SEND_ERROR) {
+                        $status .= '. Message-ID: '.$record->message_id;
+                    }
                 }
 
                 $logs[] = [
