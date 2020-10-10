@@ -582,8 +582,14 @@ class Helper
 
         if (preg_match('/png/i', $mime_type)) {
             $src = imagecreatefrompng($file);
+
+            $kek = imagecolorallocate($src, 255, 255, 255);
+            imagefill($src, 0, 0, $kek);
         } elseif (preg_match('/gif/i', $mime_type)) {
             $src = imagecreatefromgif($file);
+            
+            $kek = imagecolorallocate($src, 255, 255, 255);
+            imagefill($src, 0, 0, $kek);
         } elseif (preg_match('/bmp/i', $mime_type)) {
             $src = imagecreatefrombmp($file);
         } else {
@@ -994,7 +1000,7 @@ class Helper
                 $subdirectory = $_SERVER['SCRIPT_NAME'];
             } elseif (basename($_SERVER['PHP_SELF']) === $filename) {
                 $subdirectory = $_SERVER['PHP_SELF'];
-            } elseif (basename($_SERVER['ORIG_SCRIPT_NAME']) === $filename) {
+            } elseif (array_key_exists('ORIG_SCRIPT_NAME', $_SERVER) && basename($_SERVER['ORIG_SCRIPT_NAME']) === $filename) {
                 $subdirectory = $_SERVER['ORIG_SCRIPT_NAME']; // 1and1 shared hosting compatibility
             } else {
                 // Backtrack up the script_filename to find the portion matching
@@ -1353,4 +1359,13 @@ class Helper
         // return number_format($size)." bytes";
     }
 
+    public static function isPrint()
+    {
+        return (bool)app('request')->input('print');
+    }
+
+    public static function isDev()
+    {
+        return config('app.env') != 'production';
+    }
 }

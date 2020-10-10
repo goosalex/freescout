@@ -57,6 +57,7 @@ class Mail
 
         // Email service providers specific separators.
         '<div class="gmail_quote">', // Gmail
+        '<div id="appendonsend"></div>', // Outlook / Live / Hotmail / Microsoft
         '<div name="quote" ',
         'yahoo_quoted_', // Yahoo, full: <div id=3D"ydp6h4f5c59yahoo_quoted_2937493705"
         '------------------ 原始邮件 ------------------', // QQ
@@ -65,7 +66,7 @@ class Mail
         'regex:/<div style="border:none;border\-top:solid \#[A-Z0-9]{6} 1\.0pt;padding:3\.0pt 0in 0in 0in">[^<]*<p class="MsoNormal"><b>/', // MS Outlook
 
         // General separators.
-        '<blockquote', // General sepator
+        'regex:/<blockquote((?!quote)[^>])*>/', // General sepator. Should skip Gmail's <blockquote class="gmail_quote">.
         '<!-- originalMessage -->',
         '‐‐‐‐‐‐‐ Original Message ‐‐‐‐‐‐‐',
         '--------------- Original Message ---------------',
@@ -574,9 +575,14 @@ class Mail
     /**
      * Generate artificial Message-ID.
      */
-    public static function generateMessageId($email_address)
+    public static function generateMessageId($email_address, $raw_body = '')
     {
-        return 'fsdummy-'.str_random(16).'@'.preg_replace("/.*@/", '', $email_address);
+        $hash = str_random(16);
+        if ($raw_body) {
+            $hash = md5(strval($raw_body));
+        }
+
+        return 'fs-'.$hash.'@'.preg_replace("/.*@/", '', $email_address);
     }
 
     /**

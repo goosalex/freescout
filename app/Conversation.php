@@ -128,16 +128,16 @@ class Conversation extends Model
     /**
      * Email history options.
      */
-    const EMAIL_HISTORY_GLOBAL = 0;
-    const EMAIL_HISTORY_NONE = 1;
-    const EMAIL_HISTORY_LAST = 2;
-    const EMAIL_HISTORY_FULL = 3;
+    // const EMAIL_HISTORY_GLOBAL = 0;
+    // const EMAIL_HISTORY_NONE = 1;
+    // const EMAIL_HISTORY_LAST = 2;
+    // const EMAIL_HISTORY_FULL = 3;
 
     public static $email_history_codes = [
-        self::EMAIL_HISTORY_GLOBAL => 'global',
-        self::EMAIL_HISTORY_NONE   => 'none',
-        self::EMAIL_HISTORY_LAST   => 'last',
-        self::EMAIL_HISTORY_FULL   => 'full',
+        'global',
+        'none',
+        'last',
+        'full',
     ];
 
     /**
@@ -350,7 +350,7 @@ class Conversation extends Model
     }
 
     /**
-     * Get all published conversation thread in desc order.
+     * Get all published conversation threads in desc order.
      *
      * @return Collection
      */
@@ -1121,6 +1121,57 @@ class Conversation extends Model
         $prev_mailbox->updateFoldersCounters();
         $mailbox->updateFoldersCounters();
 
+        \Eventy::action('conversation.moved', $this, $user, $prev_mailbox);
+
+        return true;
+    }
+    /**
+     * Merge conversations
+     */
+    public function mergeConversations($merge_conversation, $user)
+    {
+        // Move all threads from old to new conversation.
+        foreach ($merge_conversation->threads as $thread) {
+            $thread->conversation_id = $this->id;
+            $thread->setMeta(Thread::META_PREV_CONVERSATION, $merge_conversation->id);
+            $thread->save();
+        }
+
+        // Add record to the new conversation.
+        Thread::create($this, Thread::TYPE_LINEITEM, '', [
+            'created_by_user_id' => $user->id,
+            'user_id'     => $this->user_id,
+            'state'       => Thread::STATE_PUBLISHED,
+            'action_type' => Thread::ACTION_TYPE_MERGED,
+            'source_via'  => Thread::PERSON_USER,
+            'source_type' => Thread::SOURCE_TYPE_WEB,
+            'customer_id' => $this->customer_id,
+            'meta'        => [Thread::META_MERGED_WITH_CONV => $merge_conversation->id],
+        ]);
+
+        // Add record to the old conversation.
+        Thread::create($merge_conversation, Thread::TYPE_LINEITEM, '', [
+            'created_by_user_id' => $user->id,
+            'user_id'     => $merge_conversation->user_id,
+            'state'       => Thread::STATE_PUBLISHED,
+            'action_type' => Thread::ACTION_TYPE_MERGED,
+            'source_via'  => Thread::PERSON_USER,
+            'source_type' => Thread::SOURCE_TYPE_WEB,
+            'customer_id' => $merge_conversation->customer_id,
+            'meta'        => [Thread::META_MERGED_INTO_CONV => $this->id],
+        ]);
+
+        // Delete old conversation.
+        $merge_conversation->deleteToFolder($user);
+
+        // Update counters.
+        $this->mailbox->updateFoldersCounters();
+        if ($this->mailbox_id != $merge_conversation->mailbox_id) {
+            $merge_conversation->mailbox->updateFoldersCounters();
+        }
+
+        \Eventy::action('conversation.merged', $this, $merge_conversation, $user);
+
         return true;
     }
 
@@ -1130,7 +1181,7 @@ class Conversation extends Model
     public static function loadUsers($conversations)
     {
         $user_ids = $conversations->pluck('user_id')->unique()->toArray();
-        if (!$user_ids) {
+        if (!$user_ids || (count($user_ids) == 1 && empty($user_ids[0]))) {
             return;
         }
 
@@ -1272,8 +1323,11 @@ class Conversation extends Model
      *
      * @return [type] [description]
      */
-    public function getWaitingSince($folder)
+    public function getWaitingSince($folder = null)
     {
+        if (!$folder) {
+            $folder = $this->folder;
+        }
         $waiting_since_field = $folder->getWaitingSinceField();
         if ($waiting_since_field) {
             return \App\User::dateDiffForHumans($this->$waiting_since_field);
@@ -1478,6 +1532,8 @@ class Conversation extends Model
 
         // Recalculate only old and new folders
         $this->mailbox->updateFoldersCounters();
+
+        \Eventy::action('conversation.deleted', $this, $user);
     }
 
     public function deleteForever()
@@ -1605,10 +1661,10 @@ class Conversation extends Model
         \Eventy::action('conversation.user_forwarded', $this, $thread, $forwarded_conversation, $forwarded_thread);
     }
 
-    public function getEmailHistoryCode()
-    {
-        return self::$email_history_codes[(int)$this->email_history] ?? 'global';
-    }
+    // public function getEmailHistoryCode()
+    // {
+    //     return self::$email_history_codes[(int)$this->email_history] ?? 'global';
+    // }
 
     public static function getEmailHistoryName($code) {
         $label = '';

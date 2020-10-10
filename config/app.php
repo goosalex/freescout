@@ -12,7 +12,7 @@ return [
     | or any other location as required by the application or its packages.
     */
 
-    'version' => '1.5.11',
+    'version' => '1.6.2',
 
     /*
     |--------------------------------------------------------------------------
@@ -193,7 +193,7 @@ return [
     | PHP extensions required by the app
     |-------------------------------------------------------------------------
     */
-    'required_extensions' => ['mysql / mysqli', 'mbstring', 'xml', 'imap', /*'mcrypt' mcrypt is deprecated*/ 'json', 'gd', 'fileinfo', 'openssl', 'zip', 'tokenizer'/*, 'dom', 'xmlwriter', 'libxml', 'phar'*/],
+    'required_extensions' => ['mysql / mysqli', 'mbstring', 'xml', 'imap', /*'mcrypt' mcrypt is deprecated*/ 'json', 'gd', 'fileinfo', 'openssl', 'zip', 'tokenizer', 'curl'/*, 'dom', 'xmlwriter', 'libxml', 'phar'*/],
 
     /*
     |--------------------------------------------------------------------------
@@ -288,6 +288,13 @@ return [
     |-------------------------------------------------------------------------
     */
     'email_user_history'    => env('APP_EMAIL_USER_HISTORY', 'full'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Disable update checker
+    |--------------------------------------------------------------------------
+    */
+    'disable_updating'    => env('APP_DISABLE_UPDATING', false),
 
     /*
     |--------------------------------------------------------------------------
