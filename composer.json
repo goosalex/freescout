@@ -37,7 +37,7 @@
         "symfony/console": "v3.4.31",
 
         "javoscript/laravel-macroable-models": "1.0.4",
-
+        "socialite-manager/socialite": "^1.1",
         "socialiteproviders/laravelpassport": "^1.0"
 
     },
